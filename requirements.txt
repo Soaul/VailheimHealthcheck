@@ -1,0 +1,3 @@
+discord.py
+valve
+python-dotenv

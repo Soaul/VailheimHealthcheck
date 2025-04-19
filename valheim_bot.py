@@ -24,32 +24,54 @@ def query_valheim_server(ip, port, timeout=3):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.settimeout(timeout)
 
-        # A2S_INFO request
         request = b'\xFF\xFF\xFF\xFF\x54Source Engine Query\x00'
         sock.sendto(request, (ip, port))
         data, _ = sock.recvfrom(4096)
 
+        # Challenge ?
         if data[4] == 0x41:
-            # 🔐 Challenge reçu
             challenge = data[5:9]
             print(f"🔐 Challenge token reçu : {challenge.hex()}")
-
-            # Rebuild request with challenge
             request = b'\xFF\xFF\xFF\xFF\x54Source Engine Query\x00' + challenge
             sock.sendto(request, (ip, port))
             data, _ = sock.recvfrom(4096)
 
         if data[4] != 0x49:
-            print("⚠️ Mauvaise réponse après challenge :", data[:20])
+            print("⚠️ Réponse inattendue après challenge :", data[:20])
             return {"online": False}
 
-        # Skip header & protocol (6), then parse 4 null-terminated strings
-        parts = data[6:].split(b'\x00', 4)
-        remaining = data[6 + sum(len(p)+1 for p in parts):]
-        players = remaining[2]
+        # Parse du paquet A2S_INFO — format structuré
+        offset = 5  # skip header + type
+        protocol = data[offset]
+        offset += 1
 
-        print(f"✅ {players} joueur(s) détecté(s)")
-        return {"online": True, "players": players}
+        def read_string():
+            nonlocal offset
+            end = data.index(b'\x00', offset)
+            result = data[offset:end].decode("utf-8", errors="ignore")
+            offset = end + 1
+            return result
+
+        name = read_string()
+        map_name = read_string()
+        folder = read_string()
+        game = read_string()
+
+        # Lire les 2 bytes suivants = ID du jeu
+        offset += 2
+
+        # Lire joueurs, max joueurs
+        players = data[offset]
+        max_players = data[offset + 1]
+
+        print(f"✅ Serveur : {name} | Map : {map_name} | {players}/{max_players} joueur(s)")
+        return {
+            "online": True,
+            "players": players,
+            "max_players": max_players,
+            "name": name,
+            "map": map_name
+        }
 
     except socket.timeout:
         print("⏱️ Timeout")

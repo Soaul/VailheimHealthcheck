@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 import discord
 from discord.ext import tasks, commands
-import valve.source.a2s
+import valve
 import socket
 
 # Load env variables (optionnel sur Railway, mais utile en local)

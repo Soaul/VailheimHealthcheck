@@ -9,7 +9,7 @@ import socket
 load_dotenv()
 
 TOKEN = os.getenv("DISCORD_TOKEN")
-CHANNEL_ID = int(os.getenv("DISCORD_CHANNEL_ID"))
+CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
 SERVER_ADDRESS = ("24.201.105.114", 2457)
 
 intents = discord.Intents.default()

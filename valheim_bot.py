@@ -5,6 +5,7 @@ from discord.ext import tasks, commands
 import valve.source.a2s
 import socket
 from dotenv import load_dotenv
+import subprocess
 
 # Load env variables (optionnel sur Railway, mais utile en local)
 load_dotenv()

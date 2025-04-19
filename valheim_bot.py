@@ -24,24 +24,28 @@ def query_valheim_server(ip, port, timeout=3):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.settimeout(timeout)
 
-        # A2S_INFO request
+        # Requête A2S_INFO
         request_data = b'\xFF\xFF\xFF\xFF\x54Source Engine Query\x00'
         sock.sendto(request_data, (ip, port))
 
         data, _ = sock.recvfrom(4096)
-        if data[4] != 0x49:
+
+        # Vérification du header
+        if len(data) < 5 or data[4] != 0x49:
+            print(f"⚠️ Mauvaise réponse du serveur : {data}")
             return {"online": False}
 
-        # Parse number of players (Byte 6 = protocol, Byte 7+ = name etc.)
-        # We skip to the player count which is the last byte before the last null bytes
-        # This is fragile parsing; better than nothing
-        players = data.count(b'\x00')  # crude fallback
-        return {"online": True, "players": max(players - 3, 0)}
+        # On tente un parsing léger du nombre de joueurs
+        players = data.count(b'\x00') - 3  # brut mais approximatif
+        players = max(players, 0)
+
+        return {"online": True, "players": players}
 
     except socket.timeout:
+        print("⏱️ Timeout — le serveur n'a pas répondu à temps.")
         return {"online": False}
     except Exception as e:
-        print(f"Erreur: {e}")
+        print(f"💥 Erreur de query : {e}")
         return {"online": False}
     finally:
         sock.close()

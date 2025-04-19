@@ -24,24 +24,29 @@ def query_valheim_server(ip, port, timeout=3):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.settimeout(timeout)
 
-        request_data = b'\xFF\xFF\xFF\xFF\x54Source Engine Query\x00'
-        sock.sendto(request_data, (ip, port))
+        # A2S_INFO request
+        request = b'\xFF\xFF\xFF\xFF\x54Source Engine Query\x00'
+        sock.sendto(request, (ip, port))
         data, _ = sock.recvfrom(4096)
 
-        # A2S_INFO reply header is 0x49
+        if data[4] == 0x41:
+            # 🔐 Challenge reçu
+            challenge = data[5:9]
+            print(f"🔐 Challenge token reçu : {challenge.hex()}")
+
+            # Rebuild request with challenge
+            request = b'\xFF\xFF\xFF\xFF\x54Source Engine Query\x00' + challenge
+            sock.sendto(request, (ip, port))
+            data, _ = sock.recvfrom(4096)
+
         if data[4] != 0x49:
-            print("⚠️ Réponse inattendue :", data[:20])
+            print("⚠️ Mauvaise réponse après challenge :", data[:20])
             return {"online": False}
 
-        # Skipping header, protocol (1 byte), server name, map name, folder, game
+        # Skip header & protocol (6), then parse 4 null-terminated strings
         parts = data[6:].split(b'\x00', 4)
-        if len(parts) < 5:
-            print("⚠️ Réponse incomplète")
-            return {"online": True, "players": "?"}
-
-        # The byte right after these null-terminated strings is the player count
         remaining = data[6 + sum(len(p)+1 for p in parts):]
-        players = remaining[2]  # Byte 2 = number of players (after game ID and dedicated flag)
+        players = remaining[2]
 
         print(f"✅ {players} joueur(s) détecté(s)")
         return {"online": True, "players": players}

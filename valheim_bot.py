@@ -12,7 +12,7 @@ load_dotenv()
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
-SERVER_ADDRESS = "24.201.105.114"
+SERVER_IP = "24.201.105.114"
 SERVER_PORT = 2457
 
 intents = discord.Intents.default()

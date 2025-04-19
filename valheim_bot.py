@@ -28,14 +28,29 @@ def query_valheim_server(ip, port, timeout=3):
         sock.sendto(request_data, (ip, port))
         data, _ = sock.recvfrom(4096)
 
-        print("✅ Réponse brute reçue :", data[:50])  # debug partiel
-        return {"online": True, "players": "?"}  # on ne parse pas les joueurs ici
+        # A2S_INFO reply header is 0x49
+        if data[4] != 0x49:
+            print("⚠️ Réponse inattendue :", data[:20])
+            return {"online": False}
+
+        # Skipping header, protocol (1 byte), server name, map name, folder, game
+        parts = data[6:].split(b'\x00', 4)
+        if len(parts) < 5:
+            print("⚠️ Réponse incomplète")
+            return {"online": True, "players": "?"}
+
+        # The byte right after these null-terminated strings is the player count
+        remaining = data[6 + sum(len(p)+1 for p in parts):]
+        players = remaining[2]  # Byte 2 = number of players (after game ID and dedicated flag)
+
+        print(f"✅ {players} joueur(s) détecté(s)")
+        return {"online": True, "players": players}
 
     except socket.timeout:
-        print("⏱️ Timeout - aucune réponse reçue")
+        print("⏱️ Timeout")
         return {"online": False}
     except Exception as e:
-        print(f"💥 Erreur de query : {e}")
+        print(f"💥 Erreur : {e}")
         return {"online": False}
     finally:
         sock.close()
@@ -46,11 +61,16 @@ async def monitor_server():
     channel = bot.get_channel(CHANNEL_ID)
     status = query_valheim_server(SERVER_IP, SERVER_PORT)
 
-    if status["online"] and last_status != "online":
-        await channel.send(f"🟢 Serveur Valheim en ligne avec environ **{status['players']} joueur(s)**.")
+    if status["online"]:
+        new_status = f"🟢 Serveur UP — {status['players']} joueur(s)"
+        if last_status != "online":
+            await channel.send(f"🟢 Serveur Valheim en ligne avec **{status['players']} joueur(s)**.")
+        await bot.change_presence(activity=discord.Game(new_status))
         last_status = "online"
-    elif not status["online"] and last_status != "offline":
-        await channel.send("🔴 Serveur Valheim **hors ligne** ou ne répond pas.")
+    else:
+        if last_status != "offline":
+            await channel.send("🔴 Serveur Valheim **hors ligne** ou ne répond pas.")
+        await bot.change_presence(activity=discord.Game("🔴 Serveur DOWN"))
         last_status = "offline"
 
 @bot.command()

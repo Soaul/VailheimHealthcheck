@@ -1,11 +1,16 @@
+import os
+from dotenv import load_dotenv
 import discord
 from discord.ext import tasks, commands
 import valve.source.a2s
 import socket
 
+# Load env variables (optionnel sur Railway, mais utile en local)
+load_dotenv()
+
 TOKEN = os.getenv("DISCORD_TOKEN")
-CHANNEL_ID = 1362959198140502138  # ID du salon Discord
-SERVER_ADDRESS = ("24.201.105.114", 2457)  # 2457 pour A2S (différent du port de jeu brut 2456)
+CHANNEL_ID = int(os.getenv("DISCORD_CHANNEL_ID"))
+SERVER_ADDRESS = ("24.201.105.114", 2457)
 
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)

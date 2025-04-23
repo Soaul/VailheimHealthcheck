@@ -24,47 +24,47 @@ def query_valheim_server(ip, port, timeout=3):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.settimeout(timeout)
 
+        # Send A2S_INFO request
         request = b'\xFF\xFF\xFF\xFF\x54Source Engine Query\x00'
         sock.sendto(request, (ip, port))
         data, _ = sock.recvfrom(4096)
 
-        # Challenge ?
+        # Handle challenge response
         if data[4] == 0x41:
-            challenge = data[5:9]
-            print(f"🔐 Challenge token reçu : {challenge.hex()}")
-            request = b'\xFF\xFF\xFF\xFF\x54Source Engine Query\x00' + challenge
+            challenge_token = data[5:9]
+            print(f"🔐 Challenge token reçu : {challenge_token.hex()}")
+
+            # Rebuild request with challenge
+            request = b'\xFF\xFF\xFF\xFF\x54Source Engine Query\x00' + challenge_token
             sock.sendto(request, (ip, port))
             data, _ = sock.recvfrom(4096)
 
         if data[4] != 0x49:
-            print("⚠️ Réponse inattendue après challenge :", data[:20])
+            print(f"⚠️ Mauvais type de réponse : {data[4]}")
             return {"online": False}
 
-        # Parse du paquet A2S_INFO — format structuré
-        offset = 5  # skip header + type
-        protocol = data[offset]
-        offset += 1
+        # Parse A2S_INFO packet
+        offset = 5  # skip header and type
 
         def read_string():
             nonlocal offset
             end = data.index(b'\x00', offset)
-            result = data[offset:end].decode("utf-8", errors="ignore")
+            s = data[offset:end].decode('utf-8', errors='ignore')
             offset = end + 1
-            return result
+            return s
 
+        protocol = data[offset]
+        offset += 1
         name = read_string()
         map_name = read_string()
         folder = read_string()
         game = read_string()
+        offset += 2  # game ID (ushort)
 
-        # Lire les 2 bytes suivants = ID du jeu
-        offset += 2
-
-        # Lire joueurs, max joueurs
         players = data[offset]
         max_players = data[offset + 1]
 
-        print(f"✅ Serveur : {name} | Map : {map_name} | {players}/{max_players} joueur(s)")
+        print(f"✅ {players}/{max_players} joueur(s) — {name} sur {map_name}")
         return {
             "online": True,
             "players": players,
@@ -74,10 +74,10 @@ def query_valheim_server(ip, port, timeout=3):
         }
 
     except socket.timeout:
-        print("⏱️ Timeout")
+        print("⏱️ Timeout — pas de réponse à la requête finale avec challenge")
         return {"online": False}
     except Exception as e:
-        print(f"💥 Erreur : {e}")
+        print(f"💥 Erreur fatale : {e}")
         return {"online": False}
     finally:
         sock.close()
